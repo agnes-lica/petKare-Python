@@ -17,18 +17,14 @@ class PetSerializer(serializers.Serializer):
     sex = serializers.ChoiceField(
         choices=SEX_CHOICES, default="Not Informed")
 
-    # traits_count = serializers.SerializerMethodField(
-    #    method_name="traits_count_function")
+    traits_count = serializers.SerializerMethodField(
+        method_name="traits_count_function")
 
     group = GroupSerializer()
     traits = TraitSerializer(many=True)
 
-    # def traits_count_function(self, obj: Pet):
-    #    count = obj
-    #    print("=" * 100)
-    #    print(obj)
-    #    print("=" * 100)
-    #    return "count"
+    def traits_count_function(self, obj: Pet):
+        return obj.traits.count()
 
     def create(self, validated_data: dict) -> Pet:
 
@@ -47,22 +43,20 @@ class PetSerializer(serializers.Serializer):
         return pet
 
     def update(self, instance, validated_data: dict):
-        group_dict = validated_data.pop("group", None)
-        if group_dict:
-            group_obj = Group.objects.get_or_create(pets=instance)[0]
-            for key, value in group_dict.items():
-                setattr(group_obj, key, value)
-            group_obj.save()
-
-        traits_list = validated_data.pop("traits", None)
-        for trait in traits_list:
-            if trait:
-                trait_obj = Trait.objects.get_or_create(pets=instance)[0]
-                for key, value in trait.items():
-                    set(trait_obj, key, value)
-                trait_obj.save()
-
         for key, value in validated_data.items():
+            if key == "group":
+                group_obj = Group.objects.get_or_create(
+                    **validated_data["group"])[0]
+                setattr(instance, key, group_obj)
+                continue
+
+            if key == "traits":
+                trait_list = validated_data["traits"]
+                new_trait = [Trait.objects.get_or_create(
+                    **trait_dict)[0] for trait_dict in trait_list]
+                instance.traits.set(new_trait)
+                continue
+
             setattr(instance, key, value)
 
         instance.save()
